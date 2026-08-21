@@ -1,0 +1,213 @@
+<!-- server rendering
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinatra Todo App (Vanilla JS)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="todo-box">
+        <h2>Ma Liste de Tâches</h2>
+        
+        <form id="todo-form" class="todo-form">
+            <input type="text" id="todo-input" placeholder="Ajouter une tâche..." required />
+            <button type="submit">Ajouter</button>
+        </form>
+
+        <ul id="todo-list" class="todo-list"></ul>
+    </div>
+
+    <script>
+        const todoList = document.getElementById('todo-list');
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+
+        // 1. LIRE : Charger les tâches depuis Sinatra
+        async function loadTodos() {
+            const res = await fetch('/api/todos');
+            const todos = await res.json();
+            
+            todoList.innerHTML = ''; 
+            
+            todos.forEach(todo => {
+                const li = document.createElement('li');
+                if (todo.completed) li.classList.add('completed');
+                
+                li.innerHTML = `
+                    <span onclick="toggleTodo(${todo.id}, ${todo.completed})">${todo.title}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">❌</button>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        // 2. CRÉER : Ajouter une nouvelle tâche
+        todoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = todoInput.value.trim();
+            if (!title) return;
+
+            await fetch('/api/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title })
+            });
+
+            todoInput.value = '';
+            loadTodos(); 
+        });
+
+        // 3. MODIFIER : Inverser le statut (Terminé / En cours)
+        async function toggleTodo(id, currentStatus) {
+            await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: !currentStatus })
+            });
+            loadTodos();
+        }
+
+        // 4. SUPPRIMER : Effacer une tâche
+        async function deleteTodo(id) {
+            await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+            loadTodos();
+        }
+
+        // Lancement au chargement de la page
+        loadTodos();
+    </script>
+</body>
+</html> -->
+
+
+<!-- serverless -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinatra Todo App (Hybrid Mode)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="todo-box">
+        <h2>Ma Liste de Tâches</h2>
+        
+        <form id="todo-form" class="todo-form">
+            <input type="text" id="todo-input" placeholder="Ajouter une tâche..." required />
+            <button type="submit">Ajouter</button>
+        </form>
+
+        <ul id="todo-list" class="todo-list"></ul>
+    </div>
+
+    <script>
+        const todoList = document.getElementById('todo-list');
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
+
+        // Fonctions d'aide pour le LocalStorage (Mode Secours)
+        function getLocalTodos() {
+            return JSON.parse(localStorage.getItem('todos')) || [];
+        }
+
+        function saveLocalTodos(todos) {
+            localStorage.setItem('todos', JSON.stringify(todos));
+        }
+
+        // Affiche la liste des tâches à l'écran
+        function renderTodos(todos) {
+            todoList.innerHTML = ''; 
+            todos.forEach(todo => {
+                const li = document.createElement('li');
+                if (todo.completed) li.classList.add('completed');
+                
+                li.innerHTML = `
+                    <span onclick="toggleTodo(${todo.id}, ${todo.completed})">${todo.title}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">❌</button>
+                `;
+                todoList.appendChild(li);
+            });
+        }
+
+        // 1. LIRE : Tente Sinatra, sinon bascule sur LocalStorage
+        async function loadTodos() {
+            try {
+                const res = await fetch('/api/todos');
+                if (!res.ok) throw new Error("Erreur serveur");
+                const todos = await res.json();
+                renderTodos(todos);
+            } catch (error) {
+                console.warn("Serveur indisponible. Mode LocalStorage activé.", error);
+                renderTodos(getLocalTodos());
+            }
+        }
+
+        // 2. CRÉER : Ajoute via le serveur ou via LocalStorage
+        todoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = todoInput.value.trim();
+            if (!title) return;
+
+            try {
+                const res = await fetch('/api/todos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+                if (!res.ok) throw new Error("Erreur serveur");
+            } catch (error) {
+                // Secours LocalStorage
+                const todos = getLocalTodos();
+                todos.push({ id: Date.now(), title, completed: false });
+                saveLocalTodos(todos);
+            }
+
+            todoInput.value = '';
+            loadTodos(); 
+        });
+
+        // 3. MODIFIER : Met à jour le statut (Serveur ou LocalStorage)
+        async function toggleTodo(id, currentStatus) {
+            try {
+                const res = await fetch(`/api/todos/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed: !currentStatus })
+                });
+                if (!res.ok) throw new Error("Erreur serveur");
+            } catch (error) {
+                // Secours LocalStorage
+                const todos = getLocalTodos();
+                const updatedTodos = todos.map(todo => {
+                    if (todo.id === id) todo.completed = !currentStatus;
+                    return todo;
+                });
+                saveLocalTodos(updatedTodos);
+            }
+            loadTodos();
+        }
+
+        // 4. SUPPRIMER : Efface la tâche (Serveur ou LocalStorage)
+        async function deleteTodo(id) {
+            try {
+                const res = await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error("Erreur serveur");
+            } catch (error) {
+                // Secours LocalStorage
+                const todos = getLocalTodos();
+                const filteredTodos = todos.filter(todo => todo.id !== id);
+                saveLocalTodos(filteredTodos);
+            }
+            loadTodos();
+        }
+
+        // Chargement initial au démarrage de la page
+        loadTodos();
+    </script>
+</body>
+</html>
