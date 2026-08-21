@@ -1,9 +1,10 @@
-# frozen_string_literal: true
-
-source "https://rubygems.org"
-
-# gem "rails"
+# Gemfile
+source 'https://rubygems.org'
 
 gem 'sinatra'
-gem 'puma' 
-gem "rackup", "~> 2.3"
+gem 'rackup'
+gem 'puma'
+
+group :development do
+  gem 'rake' # L'équivalent de 'npm run' ou 'make' en Ruby
+end

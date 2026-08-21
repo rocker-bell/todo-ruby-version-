@@ -1,107 +1,83 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sinatra + React Todo App</title>
-    <link rel="stylesheet" href="./style.css">
-    
-    <!-- Chargement de React, React DOM et Babel pour le JSX -->
-    <script src="https://unpkg.com" crossorigin></script>
-    <script src="https://unpkg.com" crossorigin></script>
-    <script src="https://unpkg.com"></script>
+    <title>Sinatra Todo App (Vanilla JS)</title>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-    <div id="root"></div>
+    <div class="todo-box">
+        <h2>Ma Liste de Tâches</h2>
+        
+        <form id="todo-form" class="todo-form">
+            <input type="text" id="todo-input" placeholder="Ajouter une tâche..." required />
+            <button type="submit">Ajouter</button>
+        </form>
 
-    <!-- Le type="text/babel" est obligatoire pour que le navigateur comprenne le JSX -->
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+        <ul id="todo-list" class="todo-list"></ul>
+    </div>
 
-        function TodoApp() {
-            const [todos, setTodos] = useState([]);
-            const [inputValue, setInputValue] = useState('');
+    <script>
+        const todoList = document.getElementById('todo-list');
+        const todoForm = document.getElementById('todo-form');
+        const todoInput = document.getElementById('todo-input');
 
-            // Charger les tâches depuis l'API Sinatra
-            useEffect(() => {
-                fetch('/api/todos')
-                    .then(res => res.json())
-                    .then(data => setTodos(data));
-            }, []);
-
-            // Ajouter une tâche
-            const addTodo = (e) => {
-                e.preventDefault();
-                if (!inputValue.trim()) return;
-
-                fetch('/api/todos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: inputValue })
-                })
-                .then(res => res.json())
-                .then(newTodo => {
-                    setTodos([...todos, newTodo]);
-                    setInputValue('');
-                });
-            };
-
-            // Inverser le statut (Terminé / En cours)
-            const toggleTodo = (id, currentStatus) => {
-                fetch(`/api/todos/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ completed: !currentStatus })
-                })
-                .then(res => res.json())
-                .then(updatedTodo => {
-                    setTodos(todos.map(t => t.id === id ? updatedTodo : t));
-                });
-            };
-
-            // Supprimer une tâche
-            const deleteTodo = (id) => {
-                fetch(`/api/todos/${id}`, { method: 'DELETE' })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            setTodos(todos.filter(t => t.id !== id));
-                        }
-                    });
-            };
-
-            return (
-                <div className="todo-box">
-                    <h2>Ma Liste de Tâches</h2>
-                    
-                    <form onSubmit={addTodo} className="todo-form">
-                        <input 
-                            type="text" 
-                            placeholder="Ajouter une tâche..." 
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                        />
-                        <button type="submit">Ajouter</button>
-                    </form>
-
-                    <ul className="todo-list">
-                        {todos.map(todo => (
-                            <li key={todo.id} className={todo.completed ? 'completed' : ''}>
-                                <span onClick={() => toggleTodo(todo.id, todo.completed)}>
-                                    {todo.title}
-                                </span>
-                                <button onClick={() => deleteTodo(todo.id)} className="delete-btn">❌</button>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            );
+        // 1. LIRE : Charger les tâches depuis Sinatra
+        async function loadTodos() {
+            const res = await fetch('/api/todos');
+            const todos = await res.json();
+            
+            todoList.innerHTML = ''; 
+            
+            todos.forEach(todo => {
+                const li = document.createElement('li');
+                if (todo.completed) li.classList.add('completed');
+                
+                li.innerHTML = `
+                    <span onclick="toggleTodo(${todo.id}, ${todo.completed})">${todo.title}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">❌</button>
+                `;
+                todoList.appendChild(li);
+            });
         }
 
-        // Rendu de l'application dans le DOM
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<TodoApp />);
+        // 2. CRÉER : Ajouter une nouvelle tâche
+        todoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = todoInput.value.trim();
+            if (!title) return;
+
+            await fetch('/api/todos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title })
+            });
+
+            todoInput.value = '';
+            loadTodos(); 
+        });
+
+        // 3. MODIFIER : Inverser le statut (Terminé / En cours)
+        async function toggleTodo(id, currentStatus) {
+            await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: !currentStatus })
+            });
+            loadTodos();
+        }
+
+        // 4. SUPPRIMER : Effacer une tâche
+        async function deleteTodo(id) {
+            await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+            loadTodos();
+        }
+
+        // Lancement au chargement de la page
+        loadTodos();
     </script>
 </body>
 </html>
