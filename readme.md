@@ -58,10 +58,11 @@ todo-ruby-version/
    http://localhost:4567
    ```
 
-## Déploiement sur GitHub Pages
+## Build et déploiement sur GitHub Pages
 
 Le projet intègre un outil d'automatisation appelé Rake pour gérer les publications. Pour compiler le projet et envoyer la version de production directement sur la branche `gh-pages` de votre dépôt GitHub, exécutez la commande suivante dans votre terminal :
 
 ```bash
+bundle exec rake build
 bundle exec rake deploy
 ```
